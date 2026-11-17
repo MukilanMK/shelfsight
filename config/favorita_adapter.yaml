@@ -1,0 +1,205 @@
+adapter:
+  name: Favorita Store 44 Adapter
+  seed: 42
+  store_nbr: 44
+  date_window:
+    start_date: '2015-08-16'
+    end_date: '2017-08-15'
+    calendar_days: 731
+    store_closures:
+    - '2015-12-25'
+    - '2016-01-01'
+    - '2016-12-25'
+    - '2017-01-01'
+    operational_days: 727
+inventory_policy:
+  review_period:
+    perishable:
+      min: 1
+      max: 3
+    non_perishable:
+      min: 3
+      max: 7
+  trailing_demand_window_days: 28
+  miss_review_prob: 0.06
+  buffer_factor:
+    perishable:
+      min: 1.01
+      max: 1.21
+    non_perishable:
+      min: 1.06
+      max: 1.31
+  initial_stock:
+    days_of_cover_min: 5.0
+    days_of_cover_max: 12.0
+  lead_time:
+    perishable:
+      mean: 2.2
+      std: 0.5
+      min: 1.0
+      max: 5.0
+    non_perishable:
+      mean: 4.5
+      std: 1.0
+      min: 2.0
+      max: 8.0
+    late_delivery_prob: 0.07
+    late_delivery_delay_days: 1
+  pack_size:
+    max_days_cover: 3.0
+    min_pack: 1
+promotion:
+  discount_range:
+    min: 0.05
+    max: 0.2
+calibration:
+  target_band:
+    min_pct: 10.0
+    max_pct: 35.0
+  max_iterations: 8
+  tune_parameters:
+  - buffer_factor.perishable.min
+  - buffer_factor.perishable.max
+  - buffer_factor.non_perishable.min
+  - buffer_factor.non_perishable.max
+  - miss_review_prob
+  - lead_time.late_delivery_prob
+pricing_and_shelf_life:
+  BREAD/BAKERY:
+    cost_range:
+    - 1.1
+    - 2.8
+    margin_pct_range:
+    - 0.25
+    - 0.4
+    shelf_life_days:
+    - 5
+    - 9
+    storage_type: ambient
+  PRODUCE:
+    cost_range:
+    - 0.9
+    - 2.5
+    margin_pct_range:
+    - 0.3
+    - 0.5
+    shelf_life_days:
+    - 8
+    - 14
+    storage_type: chilled
+  DAIRY:
+    cost_range:
+    - 1.2
+    - 3.5
+    margin_pct_range:
+    - 0.2
+    - 0.35
+    shelf_life_days:
+    - 14
+    - 28
+    storage_type: chilled
+  DELI:
+    cost_range:
+    - 2.0
+    - 4.8
+    margin_pct_range:
+    - 0.25
+    - 0.4
+    shelf_life_days:
+    - 14
+    - 30
+    storage_type: chilled
+  EGGS:
+    cost_range:
+    - 1.5
+    - 3.2
+    margin_pct_range:
+    - 0.18
+    - 0.3
+    shelf_life_days:
+    - 21
+    - 35
+    storage_type: ambient
+  GROCERY I:
+    cost_range:
+    - 0.8
+    - 4.0
+    margin_pct_range:
+    - 0.2
+    - 0.38
+    shelf_life_days:
+    - 365
+    - 730
+    storage_type: ambient
+  BEVERAGES:
+    cost_range:
+    - 0.7
+    - 3.0
+    margin_pct_range:
+    - 0.22
+    - 0.4
+    shelf_life_days:
+    - 180
+    - 365
+    storage_type: ambient
+  CLEANING:
+    cost_range:
+    - 1.0
+    - 5.0
+    margin_pct_range:
+    - 0.25
+    - 0.42
+    shelf_life_days:
+    - 730
+    - 999
+    storage_type: ambient
+  PERSONAL CARE:
+    cost_range:
+    - 1.5
+    - 6.0
+    margin_pct_range:
+    - 0.28
+    - 0.45
+    shelf_life_days:
+    - 730
+    - 999
+    storage_type: ambient
+  HOME CARE:
+    cost_range:
+    - 1.2
+    - 4.5
+    margin_pct_range:
+    - 0.25
+    - 0.4
+    shelf_life_days:
+    - 730
+    - 999
+    storage_type: ambient
+  FROZEN FOODS:
+    cost_range:
+    - 2.0
+    - 5.5
+    margin_pct_range:
+    - 0.22
+    - 0.35
+    shelf_life_days:
+    - 120
+    - 240
+    storage_type: frozen
+calibrated_results:
+  iteration: 2
+  buf_per_range:
+  - 1.01
+  - 1.21
+  buf_non_range:
+  - 1.06
+  - 1.31
+  miss_prob: 0.06
+  late_prob: 0.07
+  overall_rate_pct: 12.24
+  train_rate_pct: 12.17
+  test_rate_pct: 12.54
+  sku_stockout_min: 1.1
+  sku_stockout_med: 4.61
+  sku_stockout_max: 10.73
+  skus_with_any_pct: 100.0

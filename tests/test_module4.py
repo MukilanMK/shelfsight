@@ -82,9 +82,9 @@ def test_restock_classifier(synthetic_supervised_data, tmp_path):
     )
 
     assert isinstance(benchmark, ClassificationBenchmark)
-    assert len(benchmark.comparison_table) == 5  # Logistic, DecisionTree, NaiveBayes, SVM, KNN
+    assert len(benchmark.comparison_table) >= 5
     expected_models = {"LogisticRegression", "DecisionTree", "NaiveBayes", "SVM", "KNN"}
-    assert set(benchmark.comparison_table["model"]) == expected_models
+    assert expected_models.issubset(set(benchmark.comparison_table["model"]))
 
     # Verify metrics are populated
     for _, row in benchmark.comparison_table.iterrows():

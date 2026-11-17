@@ -1,0 +1,61 @@
+{
+  "dataset_name": "Corporación Favorita Grocery Dataset - Store 44 Adaptation",
+  "source_directory": "C:\\clg\\ml\\Shop\\ds\\favorita-grocery-sales-forecasting",
+  "store_nbr": 44,
+  "date_window": {
+    "start_date": "2015-08-16",
+    "end_date": "2017-08-15",
+    "calendar_days": 731,
+    "store_closures": [
+      "2015-12-25",
+      "2016-01-01",
+      "2016-12-25",
+      "2017-01-01"
+    ],
+    "operational_days": 727
+  },
+  "random_seed": 42,
+  "earthquake_event": {
+    "name": "Terremoto de Manabi",
+    "start_date": "2016-04-16",
+    "end_date": "2016-05-16",
+    "duration_days": 31,
+    "description": "7.8 Mw earthquake documented in holidays_events.csv as an empirical macro demand shock"
+  },
+  "deliverables": {
+    "products_csv": {
+      "path": "data/raw/products.csv",
+      "rows": 60,
+      "perishable_count": 18,
+      "non_perishable_count": 42
+    },
+    "sales_csv": {
+      "path": "data/raw/sales.csv",
+      "rows": 41781,
+      "description": "Unmodified real unit_sales as demand proxy, positive sales days only"
+    },
+    "inventory_csv": {
+      "path": "data/raw/inventory.csv",
+      "rows": 43620,
+      "grid_size": "60 items x 727 days",
+      "description": "Continuous daily simulated inventory with FIFO batch expiry for perishables"
+    }
+  },
+  "calibration_results": {
+    "target_label": "target_stockout_in_lead_time == 1",
+    "overall_stockout_rate_pct": 12.24,
+    "train_stockout_rate_pct": 12.17,
+    "test_stockout_rate_pct": 12.54,
+    "sku_stockout_min_pct": 1.1,
+    "sku_stockout_med_pct": 4.61,
+    "sku_stockout_max_pct": 10.73,
+    "skus_with_any_event_pct": 100.0
+  },
+  "real_demand_signal_metrics": {
+    "overall_zero_day_share_pct": 4.22,
+    "median_lag1_autocorrelation": 0.2451,
+    "naive_tomorrow_today_rmse": 9.0227,
+    "naive_7d_rolling_mean_rmse": 7.5997,
+    "rolling_mean_gain_over_last_val_pct": 15.77
+  }
+}

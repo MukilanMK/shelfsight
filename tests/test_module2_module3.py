@@ -46,10 +46,10 @@ def test_ml_data_preprocessor(prepared_features):
     preprocessor = MLDataPreprocessor(scaler_type="robust", test_ratio=0.20, n_splits=3)
     dataset = preprocessor.prepare_dataset(prepared_features, split_strategy=SplitStrategy.TEMPORAL)
 
-    # Check shapes
+    # Check shapes (with embargo and forward target shift, train + test <= total)
     assert len(dataset.X_train) > 0
     assert len(dataset.X_test) > 0
-    assert len(dataset.X_train) + len(dataset.X_test) == len(prepared_features)
+    assert len(dataset.X_train) + len(dataset.X_test) <= len(prepared_features)
     assert len(dataset.y_train_reg) == len(dataset.X_train)
     assert len(dataset.y_test_reg) == len(dataset.X_test)
     assert len(dataset.y_train_clf) == len(dataset.X_train)
@@ -114,6 +114,7 @@ def test_feature_selector_multi_methods(prepared_features):
     summary = selector.select_features(
         X_train=dataset.X_train,
         y_train=dataset.y_train_reg,
+        task="regression",
         top_k=8,
     )
 
@@ -121,7 +122,7 @@ def test_feature_selector_multi_methods(prepared_features):
     assert len(summary.filter_top_k) == 8
     assert len(summary.rf_top_k) == 8
     assert len(summary.rfe_selected) == 8
-    assert len(summary.ranking_table) == len(dataset.X_train.columns)
+    assert len(summary.ranking_table) == len(dataset.X_train.columns) - len(summary.dropped_correlated)
 
     # Check ranking table structure
     expected_cols = ["feature", "f_score", "kbest_rank", "rf_importance", "rf_rank", "rfe_rank", "lasso_coef", "lasso_rank", "composite_rank_score"]

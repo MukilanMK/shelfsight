@@ -71,6 +71,11 @@ FEATURES_JSON_PATH = BASE_DIR / "data" / "processed" / "selected_features.json"
 REGRESSOR_PATH = BASE_DIR / "models" / "final_ensemble_demand_forecaster.pkl"
 CLASSIFIER_PATH = BASE_DIR / "models" / "final_ensemble_restock_classifier.pkl"
 
+# Keep in sync with FeatureEngineer(tier_cutoffs=...) used by the pipeline.
+TIER_CUTOFFS = (0.6, 1.1, 2.8)  # stock / reorder-point ratio boundaries
+TIER_ORDER = {"CRITICAL_RESTOCK": 0, "REORDER_RECOMMENDED": 1, "OPTIMAL_STOCK": 2, "EXCESS_OVERSTOCK": 3}
+PRICE_ELASTICITY = -1.2  # modelling ASSUMPTION used by the what-if simulator (not learned)
+
 
 @st.cache_data
 def load_datasets() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, List[str]]:
@@ -141,7 +146,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.info(
-        "💡 **Zero-Hardcoding Guarantee**: All lead times, safety stocks, trend Z-scores, and restock urgency tiers are computed dynamically."
+        "💡 Lead times, safety stocks and trend Z-scores are computed from data. Restock-tier cutoffs and the simulator's price elasticity are configurable assumptions."
     )
 
 # Filter Data according to Sidebar Inputs
@@ -166,12 +171,12 @@ col1, col2, col3, col4, col5 = st.columns(5)
 
 total_skus = len(latest_snapshot)
 critical_restocks = (latest_snapshot["restock_urgency_tier"] == "CRITICAL_RESTOCK").sum()
-high_restocks = (latest_snapshot["restock_urgency_tier"] == "HIGH_RESTOCK").sum()
+high_restocks = (latest_snapshot["restock_urgency_tier"] == "REORDER_RECOMMENDED").sum()
 total_sales_units = filtered_df["sales_units"].sum()
 total_revenue = filtered_df["revenue_daily"].sum()
 
 col1.metric("📦 Active Monitored SKUs", f"{total_skus}")
-col2.metric("🚨 Critical Stockout Risk", f"{critical_restocks}", delta=f"{high_restocks} High Priority", delta_color="inverse")
+col2.metric("🚨 Critical Stockout Risk", f"{critical_restocks}", delta=f"{high_restocks} Reorder Soon", delta_color="inverse")
 col3.metric("🛍️ Total Units Sold", f"{total_sales_units:,.0f}")
 col4.metric("💰 Cumulative Revenue", f"${total_revenue:,.2f}")
 avg_gmroi = latest_snapshot["gmroi"].median() if "gmroi" in latest_snapshot else 0.0
@@ -325,8 +330,8 @@ with tab_restock:
     # Filter by urgency
     urgency_filter = st.multiselect(
         "Filter by Restock Urgency Tier:",
-        options=["CRITICAL_RESTOCK", "HIGH_RESTOCK", "MEDIUM_RESTOCK", "OPTIMAL_STOCK"],
-        default=["CRITICAL_RESTOCK", "HIGH_RESTOCK"],
+        options=list(TIER_ORDER.keys()),
+        default=["CRITICAL_RESTOCK", "REORDER_RECOMMENDED"],
     )
 
     restock_candidates = latest_snapshot[latest_snapshot["restock_urgency_tier"].isin(urgency_filter)].copy()
@@ -358,6 +363,7 @@ with tab_restock:
     ]].sort_values(
         by=["restock_urgency_tier", "estimated_order_cost"],
         ascending=[True, False],
+        key=lambda s: s.map(TIER_ORDER) if s.name == "restock_urgency_tier" else s,
     )
 
     st.dataframe(
@@ -427,7 +433,7 @@ with tab_simulator:
     st.subheader("🧪 Enterprise 'What-If' Scenario Simulator")
     st.markdown(
         "Evaluate price elasticity, simulate supply-chain disruptions (lead time shocks), "
-        "and test dynamic safety stock buffers in real time using the trained **XGBoost & AdaBoost Ensemble Models**."
+        "and test safety-stock buffers in real time. This simulator is a transparent formula-based what-if (price elasticity is an assumption); it does not call the trained ML models."
     )
 
     sim_sku_label = st.selectbox(
@@ -487,8 +493,8 @@ with tab_simulator:
         if np.isnan(daily_demand_std) or daily_demand_std <= 0:
             daily_demand_std = max(1.0, daily_velocity_baseline * 0.25)
 
-        # Economic Price Elasticity Demand Adjustment (-1.2 typical grocery elasticity)
-        simulated_sales_velocity = max(0.1, daily_velocity_baseline * (1.0 - 1.2 * price_delta_pct))
+        # Price-elasticity adjustment (assumption defined at top of file)
+        simulated_sales_velocity = max(0.1, daily_velocity_baseline * (1.0 + PRICE_ELASTICITY * price_delta_pct))
 
         # Dynamic Safety Stock = Z * sqrt(LeadTime * DemandVar + Velocity^2 * LeadTimeVar)
         z_service = 1.645  # 95% service level
@@ -501,19 +507,17 @@ with tab_simulator:
         # Days of Inventory Remaining (DIR)
         sim_dir = sim_stock / max(0.01, simulated_sales_velocity)
 
-        # Urgency Tier calculation
-        if sim_stock <= dynamic_safety_stock:
-            sim_urgency = "CRITICAL_RESTOCK"
-            urgency_color = "#f85149"
-        elif sim_stock <= dynamic_rop:
-            sim_urgency = "HIGH_RESTOCK"
-            urgency_color = "#d29922"
-        elif sim_stock <= dynamic_rop * 1.5:
-            sim_urgency = "MEDIUM_RESTOCK"
-            urgency_color = "#58a6ff"
+        # Urgency tier: same stock-to-ROP ratio rule and cutoffs as the pipeline
+        sim_ratio = sim_stock / max(dynamic_rop, 1.0)
+        c1, c2, c3 = TIER_CUTOFFS
+        if sim_ratio <= c1:
+            sim_urgency, urgency_color = "CRITICAL_RESTOCK", "#f85149"
+        elif sim_ratio <= c2:
+            sim_urgency, urgency_color = "REORDER_RECOMMENDED", "#d29922"
+        elif sim_ratio <= c3:
+            sim_urgency, urgency_color = "OPTIMAL_STOCK", "#3fb950"
         else:
-            sim_urgency = "OPTIMAL_STOCK"
-            urgency_color = "#3fb950"
+            sim_urgency, urgency_color = "EXCESS_OVERSTOCK", "#58a6ff"
 
         # ---------------------------------------------------------
         # DISPLAY SIMULATION RESULTS

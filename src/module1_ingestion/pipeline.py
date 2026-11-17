@@ -40,11 +40,16 @@ def run_module1_pipeline(
     print(f"               (Dropped invalid: {report.inventory_invalid_dropped})")
 
     # 2. Feature Engineering
+    from src.module2_engineering.preprocessing import MLDataPreprocessor
+    cutoff = MLDataPreprocessor.compute_train_end_date(inventory_clean["date"], test_ratio=0.20)
+    print(f"\n[Module 1 - Feature Engineering] Train cutoff date: {cutoff.date()}")
+
     engineer = FeatureEngineer(service_level=0.95)
     master_features_df = engineer.build_feature_dataset(
         products_df=products_clean,
         sales_df=sales_clean,
         inventory_df=inventory_clean,
+        train_end_date=str(cutoff.date()),
     )
 
     # 3. Persist Processed Artifacts

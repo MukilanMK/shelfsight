@@ -35,38 +35,50 @@ def run_module4_pipeline(
     preprocessor = MLDataPreprocessor(scaler_type="robust", test_ratio=0.20)
     dataset = preprocessor.prepare_dataset(df, split_strategy=SplitStrategy.TEMPORAL)
 
+    cv = preprocessor.make_time_cv(dataset)
+
     # Load selected consensus features if available
+    reg_features = dataset.feature_names
+    clf_features = dataset.feature_names
     if Path(selected_features_path).exists():
         with open(selected_features_path, "r") as f:
             selected_info = json.load(f)
-            consensus_features = [f for f in selected_info["consensus_features"] if f in dataset.X_train.columns]
-        print(f"[Module 4] Using top {len(consensus_features)} consensus features from Module 3.")
-        X_train_sub = dataset.X_train[consensus_features]
-        X_test_sub = dataset.X_test[consensus_features]
-    else:
-        print("[Module 4] Consensus features not found. Using full preprocessed feature space.")
-        X_train_sub = dataset.X_train
-        X_test_sub = dataset.X_test
+            if "regression_consensus_features" in selected_info:
+                reg_features = [f for f in selected_info["regression_consensus_features"] if f in dataset.X_train.columns]
+            elif "consensus_features" in selected_info:
+                reg_features = [f for f in selected_info["consensus_features"] if f in dataset.X_train.columns]
+            
+            if "classification_consensus_features" in selected_info:
+                clf_features = [f for f in selected_info["classification_consensus_features"] if f in dataset.X_train.columns]
+            elif "consensus_features" in selected_info:
+                clf_features = [f for f in selected_info["consensus_features"] if f in dataset.X_train.columns]
+
+    print(f"[Module 4] Using {len(reg_features)} features for regression and {len(clf_features)} for classification.")
+    X_train_reg, X_test_reg = dataset.X_train[reg_features], dataset.X_test[reg_features]
+    X_train_clf, X_test_clf = dataset.X_train[clf_features], dataset.X_test[clf_features]
 
     # 1. Demand & Sales Forecasting Regression
     forecaster = DemandForecaster(random_state=42)
     reg_benchmark = forecaster.train_and_compare(
-        X_train=X_train_sub,
+        X_train=X_train_reg,
         y_train=dataset.y_train_reg,
-        X_test=X_test_sub,
+        X_test=X_test_reg,
         y_test=dataset.y_test_reg,
         n_splits=5,
+        cv=cv,
+        baselines=dataset.baselines_test,
     )
     forecaster.save_best_model(reg_benchmark, output_dir=models_dir)
 
     # 2. Restock Urgency Action Classification
     classifier = RestockClassifier(random_state=42)
     clf_benchmark = classifier.train_and_compare(
-        X_train=X_train_sub,
+        X_train=X_train_clf,
         y_train=dataset.y_train_clf,
-        X_test=X_test_sub,
+        X_test=X_test_clf,
         y_test=dataset.y_test_clf,
         n_splits=5,
+        cv=cv,
     )
     classifier.save_best_model(clf_benchmark, output_dir=models_dir)
 

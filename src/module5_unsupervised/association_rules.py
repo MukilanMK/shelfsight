@@ -61,6 +61,26 @@ class MarketBasketAnalyzer:
         # Filter out baskets with only 1 item since rules require pairs
         basket_counts = sales_with_names.groupby("basket_id").size()
         multi_item_baskets = basket_counts[basket_counts >= 2].index
+
+        # Graceful handling when no multi-item baskets exist (e.g. Favorita dataset)
+        if len(multi_item_baskets) == 0:
+            print("[MarketBasketAnalyzer] Notice: Favorita dataset does not contain multi-item transaction baskets.")
+            print("[MarketBasketAnalyzer] Skipping Apriori rule generation (Instacart experiment recommended for real co-purchase bundles).")
+            empty_bundles_df = pd.DataFrame(columns=[
+                "primary_item", "bundled_recommendation", "support", "confidence",
+                "lift", "is_deadstock_liquidation_bundle", "bundle_strategy"
+            ])
+            empty_rules_df = pd.DataFrame(columns=[
+                "antecedents", "consequents", "antecedents_str", "consequents_str",
+                "support", "confidence", "lift"
+            ])
+            return AssociationMiningResults(
+                frequent_itemsets=pd.DataFrame(),
+                all_rules=empty_rules_df,
+                slow_mover_bundles=empty_bundles_df,
+                min_support_used=self.min_support,
+            )
+
         sales_multi = sales_with_names[sales_with_names["basket_id"].isin(multi_item_baskets)]
 
         print(f"[MarketBasketAnalyzer] Transforming {len(multi_item_baskets)} multi-item shopping baskets...")

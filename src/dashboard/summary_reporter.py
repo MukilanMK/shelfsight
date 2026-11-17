@@ -95,26 +95,33 @@ class ExecutiveSummaryReporter:
 
         if model_path.exists():
             reg_model = joblib.load(model_path)
-            # Preprocess features
-            preprocessor = MLDataPreprocessor(scaler_type="robust")
-            ds = preprocessor.prepare_dataset(df_features, split_strategy=SplitStrategy.TEMPORAL)
+            preprocessor_path = self.models_dir / "preprocessor.pkl"
+            
+            try:
+                if preprocessor_path.exists():
+                    preprocessor = MLDataPreprocessor.load(preprocessor_path)
+                    X_latest_df = preprocessor.transform(latest_df)
+                else:
+                    preprocessor = MLDataPreprocessor(scaler_type="robust")
+                    ds = preprocessor.prepare_dataset(df_features, split_strategy=SplitStrategy.TEMPORAL)
+                    X_latest_df = preprocessor.transform(latest_df)
 
-            if self.selected_features_path.exists():
-                with open(self.selected_features_path, "r") as f:
-                    sel = json.load(f)
-                    feats = [f for f in sel["consensus_features"] if f in ds.X_test.columns]
-            else:
-                feats = ds.feature_names
+                if self.selected_features_path.exists():
+                    with open(self.selected_features_path, "r") as f:
+                        sel = json.load(f)
+                        feats = sel.get("regression_consensus_features", sel.get("consensus_features", []))
+                        feats = [f for f in feats if f in X_latest_df.columns]
+                else:
+                    feats = X_latest_df.columns.tolist()
 
-            # Extract feature rows corresponding to latest_df
-            X_latest_scaled = preprocessor.scaler.transform(latest_df[[c for c in preprocessor.feature_names if c in latest_df.columns]])
-            X_latest_df = pd.DataFrame(X_latest_scaled, columns=[c for c in preprocessor.feature_names if c in latest_df.columns])
-            X_sub = X_latest_df[[c for c in feats if c in X_latest_df.columns]]
-
-            predicted_velocity = np.maximum(0, reg_model.predict(X_sub))
-            latest_df["predicted_daily_velocity"] = np.round(predicted_velocity, 1)
+                X_sub = X_latest_df[feats]
+                predicted_velocity = np.maximum(0, reg_model.predict(X_sub))
+                latest_df["predicted_daily_velocity"] = np.round(predicted_velocity, 1)
+            except Exception as e:
+                print(f"[DashboardReporter] Warning: Model prediction failed ({e}). Falling back to velocity_7d.")
+                latest_df["predicted_daily_velocity"] = np.round(latest_df.get("velocity_7d", 0), 1)
         else:
-            latest_df["predicted_daily_velocity"] = np.round(latest_df["velocity_7d"], 1)
+            latest_df["predicted_daily_velocity"] = np.round(latest_df.get("velocity_7d", 0), 1)
 
         # Dynamic trend acceleration score = predicted_velocity * (1 + max(0, zscore))
         accel_multiplier = 1.0 + np.maximum(0, latest_df["trend_acceleration_zscore"].fillna(0))

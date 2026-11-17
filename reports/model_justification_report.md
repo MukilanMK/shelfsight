@@ -1,23 +1,27 @@
 # Module 6 (Unit-V) Ensemble Model Justification Report
 
 ## 1. Demand Velocity Regression Benchmark
-| ensemble_model          | best_params                                                                   |   test_rmse |   test_mae |   test_r2 |   cv_rmse_mean |   cv_rmse_std |   overfitting_gap | is_overfitting   |
-|:------------------------|:------------------------------------------------------------------------------|------------:|-----------:|----------:|---------------:|--------------:|------------------:|:-----------------|
-| XGBoost                 | {'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 120, 'subsample': 0.8} |      0.6783 |     0.3246 |    0.9961 |         0.6064 |        0.0185 |            0.235  | False            |
-| Gradient Boosting       | {'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 100}                   |      0.7051 |     0.3632 |    0.9958 |         0.6457 |        0.0136 |            0.2372 | False            |
-| Random Forest (Bagging) | {'max_depth': None, 'n_estimators': 50}                                       |      0.818  |     0.2939 |    0.9943 |         0.8492 |        0.0399 |            0.5148 | True             |
-| AdaBoost                | {'learning_rate': 0.1, 'n_estimators': 80}                                    |      2.2197 |     1.649  |    0.9583 |         2.1723 |        0.0402 |            0.0303 | False            |
+| ensemble_model                          | best_params                                                                   |   test_rmse |   test_mae |   test_r2 |   test_wape |   cv_r2_mean |   cv_rmse_mean |   cv_rmse_std |   overfitting_gap |   is_overfitting |
+|:----------------------------------------|:------------------------------------------------------------------------------|------------:|-----------:|----------:|------------:|-------------:|---------------:|--------------:|------------------:|-----------------:|
+| XGBoost                                 | {'learning_rate': 0.05, 'max_depth': 3, 'n_estimators': 60, 'subsample': 1.0} |     11.034  |     5.3317 |    0.6781 |      0.3863 |       0.6842 |        11.3946 |        3.1529 |            2.6839 |                0 |
+| Gradient Boosting                       | {'learning_rate': 0.05, 'max_depth': 3, 'n_estimators': 100}                  |     11.0635 |     5.2499 |    0.6764 |      0.3804 |       0.675  |        11.5451 |        3.1203 |            0.1284 |                0 |
+| Random Forest (Bagging)                 | {'max_depth': None, 'n_estimators': 100}                                      |     11.9307 |     5.228  |    0.6237 |      0.3788 |       0.5649 |        13.0514 |        2.7864 |            7.424  |                1 |
+| AdaBoost                                | {'learning_rate': 0.05, 'n_estimators': 40}                                   |     16.7673 |     7.0956 |    0.2568 |      0.5141 |       0.5607 |        13.4572 |        3.012  |            1.6242 |                1 |
+| Baseline: 7-day mean                    | nan                                                                           |     12.5477 |     5.8707 |    0.5838 |      0.4253 |     nan      |       nan      |      nan      |          nan      |              nan |
+| Baseline: 14-day mean                   | nan                                                                           |     12.743  |     5.9382 |    0.5707 |      0.4302 |     nan      |       nan      |      nan      |          nan      |              nan |
+| Baseline: last value (tomorrow = today) | nan                                                                           |     14.9578 |     6.8529 |    0.4085 |      0.4965 |     nan      |       nan      |      nan      |          nan      |              nan |
+| Baseline: same weekday last week        | nan                                                                           |     15.2324 |     6.5909 |    0.3866 |      0.4775 |     nan      |       nan      |      nan      |          nan      |              nan |
 
 **Selected Production Model**: **XGBoost**
-- **Justification**: Exhibits optimal bias-variance tradeoff with minimal holdout RMSE and consistent cross-validation stability without overfitting.
+- **Justification**: Selected on cross-validated RMSE over chronological folds (the test period is used once, for reporting). Rows prefixed 'Baseline' are naive forecasts the model must beat.
 
-## 2. Restock Urgency Classification Benchmark
-| ensemble_model          | best_params                                                                  |   accuracy |   precision_macro |   recall_macro |   f1_macro |   roc_auc_ovr |   cv_f1_mean |   cv_f1_std |   overfitting_gap | is_overfitting   |
-|:------------------------|:-----------------------------------------------------------------------------|-----------:|------------------:|---------------:|-----------:|--------------:|-------------:|------------:|------------------:|:-----------------|
-| AdaBoost                | {'learning_rate': 0.1, 'n_estimators': 40}                                   |     1      |            1      |         1      |     1      |             1 |       0.9997 |      0.0006 |            0.0003 | False            |
-| Gradient Boosting       | {'learning_rate': 0.05, 'max_depth': 3, 'n_estimators': 50}                  |     1      |            1      |         1      |     1      |             1 |       0.9997 |      0.0006 |            0.0003 | False            |
-| Random Forest (Bagging) | {'criterion': 'gini', 'max_depth': 10, 'n_estimators': 100}                  |     0.9995 |            0.9998 |         0.9988 |     0.9993 |             1 |       0.9978 |      0.0017 |            0.0022 | False            |
-| XGBoost                 | {'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 60, 'subsample': 1.0} |     0.9963 |            0.9909 |         0.9923 |     0.9916 |             1 |       0.9919 |      0.0048 |            0.0081 | False            |
+## 2. Stock-out Risk Classification Benchmark
+| ensemble_model          | best_params                                                                    |   accuracy |   precision_macro |   recall_macro |   f1_macro |   roc_auc_ovr |   pr_auc |   precision_pos |   recall_pos |   f1_pos |   cv_f1_mean |   cv_f1_std |   overfitting_gap | is_overfitting   |
+|:------------------------|:-------------------------------------------------------------------------------|-----------:|------------------:|---------------:|-----------:|--------------:|---------:|----------------:|-------------:|---------:|-------------:|------------:|------------------:|:-----------------|
+| Random Forest (Bagging) | {'criterion': 'gini', 'max_depth': 10, 'n_estimators': 100}                    |     0.8063 |            0.6587 |         0.7714 |     0.6824 |        0.8549 |   0.476  |          0.3633 |       0.7249 |   0.484  |       0.4743 |      0.0208 |            0.1801 | True             |
+| XGBoost                 | {'learning_rate': 0.05, 'max_depth': 5, 'n_estimators': 120, 'subsample': 0.8} |     0.7844 |            0.6489 |         0.7746 |     0.6671 |        0.8558 |   0.489  |          0.3395 |       0.7615 |   0.4696 |       0.4636 |      0.0222 |            0.0958 | True             |
+| Gradient Boosting       | {'learning_rate': 0.1, 'max_depth': 3, 'n_estimators': 100}                    |     0.8877 |            0.7583 |         0.6297 |     0.6637 |        0.8565 |   0.4887 |          0.6117 |       0.2854 |   0.3892 |       0.3646 |      0.0574 |            0.1016 | True             |
+| AdaBoost                | {'learning_rate': 0.2, 'n_estimators': 80}                                     |     0.8804 |            0.7643 |         0.5475 |     0.5568 |        0.8421 |   0.442  |          0.6433 |       0.1033 |   0.178  |       0.0862 |      0.1056 |           -0.0201 | False            |
 
-**Selected Production Model**: **AdaBoost**
-- **Justification**: Achieves superior Macro F1 and ROC-AUC scores across multi-class restocking boundaries, demonstrating robust generalization over single-tree baselines.
+**Selected Production Model**: **Random Forest (Bagging)**
+- **Justification**: Selected on cross-validated F1 (positive class when binary, macro otherwise) over chronological folds. Check positive-class precision/recall (precision_pos, recall_pos, f1_pos) and PR-AUC, which Macro F1 can hide when stock-outs are rare.

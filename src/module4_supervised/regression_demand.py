@@ -21,10 +21,14 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.linear_model import Lasso, LinearRegression, Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, TimeSeriesSplit
 
 from src.config import MODELS_DIR, REPORTS_DIR
-from src.module2_engineering.validation_tuning import ModelTuner, ValidationResults
+from src.module2_engineering.validation_tuning import (
+    ModelTuner,
+    ValidationResults,
+    regression_baseline_table,
+)
 
 
 @dataclass
@@ -35,6 +39,7 @@ class RegressionModelMetrics:
     test_rmse: float
     test_mae: float
     test_r2: float
+    test_wape: float
     cv_val_r2_mean: float
     cv_val_r2_std: float
     overfitting_gap: float
@@ -49,6 +54,7 @@ class RegressionBenchmark:
     best_model_name: str
     best_model: BaseEstimator
     models: Dict[str, RegressionModelMetrics]
+    baseline_table: Optional[pd.DataFrame] = None
 
 
 class DemandForecaster:
@@ -67,11 +73,14 @@ class DemandForecaster:
         X_test: pd.DataFrame,
         y_test: pd.Series,
         n_splits: int = 5,
+        cv: Any = None,
+        baselines: Optional[Dict[str, np.ndarray]] = None,
     ) -> RegressionBenchmark:
         """
         Fits Linear Regression, Ridge, and Lasso, performing K-Fold CV and hyperparameter tuning.
         """
-        cv = KFold(n_splits=n_splits, shuffle=True, random_state=self.random_state)
+        # Chronological CV by default: shuffled K-Fold lets the model train on days after the ones it is scored on.
+        cv = cv if cv is not None else TimeSeriesSplit(n_splits=n_splits)
         results: Dict[str, RegressionModelMetrics] = {}
 
         # 1. Linear Regression (Baseline OLS)
@@ -169,25 +178,40 @@ class DemandForecaster:
                 "test_rmse": m.test_rmse,
                 "test_mae": m.test_mae,
                 "test_r2": m.test_r2,
+                "test_wape": m.test_wape,
                 "cv_r2_mean": m.cv_val_r2_mean,
                 "cv_r2_std": m.cv_val_r2_std,
                 "overfitting_gap": m.overfitting_gap,
                 "is_overfitting": m.is_overfitting,
             })
-        comparison_df = pd.DataFrame(rows).sort_values(by="test_rmse", ascending=True).reset_index(drop=True)
+        # Champion is chosen on cross-validated R2 (time-ordered folds), NOT on the test set.
+        comparison_df = pd.DataFrame(rows).sort_values(by="cv_r2_mean", ascending=False).reset_index(drop=True)
 
         best_model_name = comparison_df.iloc[0]["model"]
         best_model_obj = results[best_model_name].model_obj
 
         print(f"\n[DemandForecaster] Regression Benchmark Results:")
         print(comparison_df.to_string(index=False))
-        print(f" Best Performer: {best_model_name} (RMSE={comparison_df.iloc[0]['test_rmse']:.4f}, R2={comparison_df.iloc[0]['test_r2']:.4f})")
+        print(f" Best Performer (by CV R2): {best_model_name} (test RMSE={comparison_df.iloc[0]['test_rmse']:.4f}, test R2={comparison_df.iloc[0]['test_r2']:.4f})")
+
+        baseline_df = None
+        if baselines:
+            baseline_df = regression_baseline_table(y_test, baselines)
+            print("\n[DemandForecaster] Naive baselines on the same test rows:")
+            print(baseline_df.to_string(index=False))
+            best_base = float(baseline_df['test_rmse'].min())
+            champ = float(comparison_df.iloc[0]['test_rmse'])
+            gain = 100.0 * (best_base - champ) / best_base if best_base > 0 else 0.0
+            print(f" Champion vs best baseline: RMSE {champ:.4f} vs {best_base:.4f} ({gain:+.1f}% improvement)")
+            if champ >= best_base:
+                print(" WARNING: no model beats the naive baseline - report this honestly.")
 
         return RegressionBenchmark(
             comparison_table=comparison_df,
             best_model_name=best_model_name,
             best_model=best_model_obj,
             models=results,
+            baseline_table=baseline_df,
         )
 
     def _compute_metrics(
@@ -203,6 +227,7 @@ class DemandForecaster:
         rmse = float(np.sqrt(mean_squared_error(y_test, y_pred)))
         mae = float(mean_absolute_error(y_test, y_pred))
         r2 = float(r2_score(y_test, y_pred))
+        wape = float(np.abs(np.asarray(y_test) - np.asarray(y_pred)).sum() / max(np.abs(np.asarray(y_test)).sum(), 1e-8))
 
         return RegressionModelMetrics(
             model_name=name,
@@ -210,6 +235,7 @@ class DemandForecaster:
             test_rmse=round(rmse, 4),
             test_mae=round(mae, 4),
             test_r2=round(r2, 4),
+            test_wape=round(wape, 4),
             cv_val_r2_mean=cv_res.val_scores_mean,
             cv_val_r2_std=cv_res.val_scores_std,
             overfitting_gap=cv_res.overfitting_gap,

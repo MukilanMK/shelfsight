@@ -35,38 +35,51 @@ def run_module6_pipeline(
     preprocessor = MLDataPreprocessor(scaler_type="robust", test_ratio=0.20)
     dataset = preprocessor.prepare_dataset(df, split_strategy=SplitStrategy.TEMPORAL)
 
+    cv = preprocessor.make_time_cv(dataset)
+
     # Use consensus features from Module 3
+    reg_features = dataset.feature_names
+    clf_features = dataset.feature_names
     if Path(selected_features_path).exists():
         with open(selected_features_path, "r") as f:
             selected_info = json.load(f)
-            consensus_features = [f for f in selected_info["consensus_features"] if f in dataset.X_train.columns]
-        print(f"[Module 6] Benchmarking ensembles using {len(consensus_features)} consensus features.")
-        X_train_sub = dataset.X_train[consensus_features]
-        X_test_sub = dataset.X_test[consensus_features]
-    else:
-        X_train_sub = dataset.X_train
-        X_test_sub = dataset.X_test
+            if "regression_consensus_features" in selected_info:
+                reg_features = [f for f in selected_info["regression_consensus_features"] if f in dataset.X_train.columns]
+            elif "consensus_features" in selected_info:
+                reg_features = [f for f in selected_info["consensus_features"] if f in dataset.X_train.columns]
+
+            if "classification_consensus_features" in selected_info:
+                clf_features = [f for f in selected_info["classification_consensus_features"] if f in dataset.X_train.columns]
+            elif "consensus_features" in selected_info:
+                clf_features = [f for f in selected_info["consensus_features"] if f in dataset.X_train.columns]
+
+    print(f"[Module 6] Benchmarking ensembles using {len(reg_features)} reg features and {len(clf_features)} clf features.")
+    X_train_reg, X_test_reg = dataset.X_train[reg_features], dataset.X_test[reg_features]
+    X_train_clf, X_test_clf = dataset.X_train[clf_features], dataset.X_test[clf_features]
 
     engine = EnsembleModelEngine(random_state=42)
 
     # 1. Regression Ensembles
     print("\n--- Benchmarking Regression Ensembles (Bagging & Boosting) ---")
     reg_df, best_reg_name, best_reg_model = engine.benchmark_regression_ensembles(
-        X_train=X_train_sub,
+        X_train=X_train_reg,
         y_train=dataset.y_train_reg,
-        X_test=X_test_sub,
+        X_test=X_test_reg,
         y_test=dataset.y_test_reg,
         n_splits=5,
+        cv=cv,
+        baselines=dataset.baselines_test,
     )
 
     # 2. Classification Ensembles
     print("\n--- Benchmarking Classification Ensembles (Bagging & Boosting) ---")
     clf_df, best_clf_name, best_clf_model = engine.benchmark_classification_ensembles(
-        X_train=X_train_sub,
+        X_train=X_train_clf,
         y_train=dataset.y_train_clf,
-        X_test=X_test_sub,
+        X_test=X_test_clf,
         y_test=dataset.y_test_clf,
         n_splits=5,
+        cv=cv,
     )
 
     # 3. Model Justification Report
